@@ -83,6 +83,8 @@ with tab3:
         Sistem pelaporan stok harian NTE (Network Terminal Environment) untuk:
         - Area **Telkom Bandung** (12 warehouse)
         - Area **Telkom Soreang** (5 warehouse)
+        - Area **Telkomsel Bandung** (12 warehouse)
+        - Area **Telkomsel Soreang** (5 warehouse)
         
         **Fitur:**
         - ✏️ Input stok manual per warehouse
