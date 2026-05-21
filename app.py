@@ -1,6 +1,6 @@
 """
 NTE Stock Dashboard - Main App
-Telkom Indonesia | Bandung & Soreang Area
+Telkom Akses Indonesia | Bandung & Soreang Area
 """
 
 import streamlit as st
@@ -177,7 +177,7 @@ html, body, [class*="css"] {
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### 📦 NTE Dashboard")
-    st.markdown("**Telkom Indonesia**")
+    st.markdown("**Telkom Akses Indonesia**")
     st.markdown("Area Bandung & Soreang")
     st.divider()
     
