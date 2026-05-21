@@ -6,18 +6,19 @@ Master data untuk NTE Dashboard
 AREA_CONFIG = {
     "TELKOM BANDUNG": {
         "warehouses": [
-            "WH Bandung Pusat",
-            "WH Bandung Utara",
-            "WH Bandung Selatan",
-            "WH Bandung Timur",
-            "WH Bandung Barat",
-            "WH Cicadas",
-            "WH Cimahi",
-            "WH Cibeunying",
-            "WH Bojonagara",
-            "WH Kiaracondong",
-            "WH Ujungberung",
-            "WH Gedebage",
+            "WH SO Ahmad Yani",
+            "WH SO Bandung Centrium",
+            "WH SO Cianjur",
+            "WH SO Cijaura",
+            "WH SO Cimahi",
+            "WH SO Gegerkalong",
+            "WH SO Kopo",
+            "WH SO Lembang",
+            "WH SO Padalarang",
+            "WH SO Rajawali",
+            "WH SO Sindanglaya",
+            "WH SO Ujungbrung",
+            "WH WITEL JABAR TENGAH (BANDUNG)",
         ]
     },
     "TELKOM SOREANG": {
