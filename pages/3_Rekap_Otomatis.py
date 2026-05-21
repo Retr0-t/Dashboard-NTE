@@ -1,6 +1,7 @@
 """
 Page: Rekap Otomatis
-Command center untuk generate rekap per area + grand total per type NTE
+Format persis seperti laporan STOCK NTE TELKOM:
+Kolom: JENIS 2 | STATUS | TYPE | [WH1] [WH2] ... | Grand Total
 """
 
 import streamlit as st
@@ -15,7 +16,7 @@ from utils.database import (
     get_rekap_per_wh, get_rekap_grand_total, log_rekap
 )
 from utils.export_utils import export_rekap_area_excel
-from data.master_data import AREA_CONFIG, NTE_CATALOG
+from data.master_data import AREA_CONFIG, NTE_CATALOG, NTE_STATUS
 
 init_db()
 
@@ -29,33 +30,17 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     background: linear-gradient(135deg, #4A148C, #7B1FA2);
     color: white; padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 1.5rem;
 }
-.page-header h2 { font-family: 'Space Grotesk', sans-serif; margin: 0; font-size: 1.5rem; }
-.page-header p { margin: 0.25rem 0 0; opacity: 0.8; font-size: 0.9rem; }
-.grand-total-box {
-    background: linear-gradient(135deg, #FFF8E1, #FFF3E0);
-    border: 2px solid #F57F17;
-    border-radius: 12px;
-    padding: 1.5rem;
-    text-align: center;
-    margin-bottom: 1rem;
+.page-header h2 { font-family:'Space Grotesk',sans-serif; margin:0; font-size:1.5rem; }
+.page-header p  { margin:.25rem 0 0; opacity:.8; font-size:.9rem; }
+.area-header {
+    background: linear-gradient(90deg,#1E3A5F,#2E6DA4);
+    color:white; padding:.75rem 1.25rem; border-radius:8px 8px 0 0;
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:1rem; margin-top:1rem;
 }
-.pivot-area-header {
-    background: linear-gradient(90deg, #1E3A5F 0%, #2E6DA4 100%);
-    color: white;
-    padding: 0.75rem 1.25rem;
-    border-radius: 8px 8px 0 0;
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 600;
-    font-size: 1rem;
-    margin-top: 1rem;
-}
-.rekap-command-box {
-    background: linear-gradient(135deg, #E8EAF6, #F3E5F5);
-    border: 2px solid #7B1FA2;
-    border-radius: 12px;
-    padding: 2rem;
-    text-align: center;
-    margin-bottom: 1.5rem;
+.grand-box {
+    background:linear-gradient(135deg,#FFF8E1,#FFF3E0);
+    border:2px solid #F57F17; border-radius:12px;
+    padding:1.2rem; text-align:center; margin:1rem 0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -63,7 +48,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 st.markdown("""
 <div class="page-header">
     <h2>⚡ Rekap Otomatis</h2>
-    <p>Generate rekap stok lengkap semua warehouse dengan 1 klik — per area beserta grand total per type NTE</p>
+    <p>Generate rekap STOCK NTE — format pivot per area, grand total per type NTE</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -71,30 +56,28 @@ st.markdown("""
 with st.sidebar:
     st.markdown("### ⚙️ Opsi Rekap")
     available_dates = get_available_dates()
-    
     if not available_dates:
-        st.warning("Belum ada data tersedia.")
+        st.warning("Belum ada data. Input stok terlebih dahulu.")
         st.stop()
-    
+
     selected_date = st.selectbox("📅 Tanggal Rekap", available_dates)
-    rekap_scope = st.radio(
-        "📋 Scope Rekap",
-        ["Semua Area", "TELKOM BANDUNG", "TELKOM SOREANG"],
-        index=0
-    )
-    
+    rekap_scope   = st.radio("📋 Scope", ["Semua Area"] + list(AREA_CONFIG.keys()), index=0)
+    show_zeros    = st.checkbox("Tampilkan baris stok = 0", value=False)
     st.divider()
-    show_zeros = st.checkbox("Tampilkan baris stok = 0", value=False)
+    st.caption(f"Total WH terdaftar: {sum(len(v['warehouses']) for v in AREA_CONFIG.values())}")
 
 
-def build_pivot(area: str, tanggal: str, warehouses: list, show_zeros: bool = False) -> pd.DataFrame:
-    """Build pivot table: rows = (jenis, type, status), cols = warehouses + grand total"""
+def build_pivot(area: str, tanggal: str, warehouses: list) -> pd.DataFrame:
+    """
+    Pivot table format laporan asli:
+    Baris  = (jenis_nte, type_nte, status_nte)
+    Kolom  = warehouse names + GRAND TOTAL
+    Urutan = sesuai NTE_CATALOG (jenis) → type → NTE BARU dulu, REFURBISH kemudian
+    """
     df = get_rekap_per_wh(area, tanggal)
-    
     if df.empty:
         return pd.DataFrame()
-    
-    # Pivot
+
     pivot = df.pivot_table(
         index=["jenis_nte", "type_nte", "status_nte"],
         columns="warehouse",
@@ -102,185 +85,165 @@ def build_pivot(area: str, tanggal: str, warehouses: list, show_zeros: bool = Fa
         aggfunc="sum",
         fill_value=0
     ).reset_index()
-    
     pivot.columns.name = None
-    
-    # Add missing WH columns as 0
+
+    # Pastikan semua kolom WH ada meski kosong
     for wh in warehouses:
         if wh not in pivot.columns:
             pivot[wh] = 0
-    
-    # Grand total column
-    pivot["GRAND TOTAL"] = pivot[warehouses].sum(axis=1)
-    
+
+    pivot["Grand Total"] = pivot[warehouses].sum(axis=1)
+
+    # ── Urutkan sesuai urutan NTE_CATALOG + status (NTE BARU → REFURBISH) ──
+    jenis_order  = {j: i for i, j in enumerate(NTE_CATALOG.keys())}
+    status_order = {s: i for i, s in enumerate(NTE_STATUS)}
+    pivot["_jo"] = pivot["jenis_nte"].map(jenis_order).fillna(99)
+    pivot["_so"] = pivot["status_nte"].map(status_order).fillna(99)
+    pivot = pivot.sort_values(["_jo", "type_nte", "_so"]).drop(columns=["_jo", "_so"])
+
     if not show_zeros:
-        pivot = pivot[pivot["GRAND TOTAL"] > 0]
-    
-    # Sort by jenis then type
-    pivot = pivot.sort_values(["jenis_nte", "type_nte", "status_nte"])
-    
-    return pivot
+        pivot = pivot[pivot["Grand Total"] > 0]
+
+    return pivot.reset_index(drop=True)
 
 
-def render_pivot_table(pivot_df: pd.DataFrame, warehouses: list, area: str):
-    """Render pivot sebagai styled dataframe"""
+def render_rekap_table(pivot_df: pd.DataFrame, warehouses: list, area: str):
+    """Tampilkan pivot table dengan styling seperti laporan asli."""
     if pivot_df.empty:
-        st.info(f"Tidak ada data stok untuk {area} pada tanggal ini.")
+        st.info(f"Tidak ada data untuk {area} pada tanggal ini.")
         return
-    
-    display_cols = ["jenis_nte", "type_nte", "status_nte"] + warehouses + ["GRAND TOTAL"]
-    available = [c for c in display_cols if c in pivot_df.columns]
-    df_display = pivot_df[available].copy()
-    
-    rename_map = {"jenis_nte": "Jenis NTE", "type_nte": "Type NTE", "status_nte": "Status"}
-    df_display = df_display.rename(columns=rename_map)
-    
-    # Styling
-    def highlight_grand_total(col):
-        if col.name == "GRAND TOTAL":
-            return ["background-color: #FADBD8; font-weight: bold; color: #C0392B"] * len(col)
-        return [""] * len(col)
-    
-    def highlight_status(val):
-        if val == "Baru":
-            return "background-color: #D5F5E3; color: #1E8449"
-        elif val == "Refurbish":
-            return "background-color: #FFF8E1; color: #F57F17"
-        return ""
-    
-    styled = df_display.style\
-        .apply(highlight_grand_total)\
-        .applymap(highlight_status, subset=["Status"])\
-        .format({wh: "{:,.0f}" for wh in warehouses if wh in df_display.columns})\
-        .format({"GRAND TOTAL": "{:,.0f}"})\
-        .set_properties(**{"font-size": "12px"})
-    
-    st.dataframe(styled, use_container_width=True, hide_index=True)
-    
-    # Summary totals
-    total_all = int(pivot_df["GRAND TOTAL"].sum())
-    st.markdown(f"""
-    <div style="text-align:right; color: #C0392B; font-weight: 700; font-size: 1rem; padding: 0.5rem 0;">
-        🔢 Total Keseluruhan {area}: <span style="font-size:1.3rem">{total_all:,}</span> unit
-    </div>
-    """, unsafe_allow_html=True)
 
+    display_cols = ["jenis_nte", "type_nte", "status_nte"] + warehouses + ["Grand Total"]
+    available    = [c for c in display_cols if c in pivot_df.columns]
+    df_show      = pivot_df[available].rename(columns={
+        "jenis_nte":  "JENIS 2",
+        "type_nte":   "TYPE",
+        "status_nte": "STATUS",
+    })
 
-# ── COMMAND BUTTON ─────────────────────────────────────────────────────────────
-st.markdown(f"""
-<div class="rekap-command-box">
-    <div style="font-size:2.5rem">⚡</div>
-    <div style="font-family:'Space Grotesk',sans-serif; font-size:1.3rem; font-weight:700; color:#4A148C; margin:0.5rem 0;">
-        REKAP OTOMATIS — {rekap_scope}
-    </div>
-    <div style="color:#666; font-size:0.9rem">Tanggal: <b>{selected_date}</b></div>
-</div>
-""", unsafe_allow_html=True)
+    def style_table(styler):
+        # Grand Total kolom — merah muda
+        if "Grand Total" in styler.columns:
+            styler.set_properties(subset=["Grand Total"],
+                **{"background-color": "#FADBD8", "font-weight": "bold", "color": "#C0392B"})
+        # Status — hijau / kuning
+        def color_status(val):
+            if val == "NTE BARU":    return "background-color:#D5F5E3; color:#1E8449; font-weight:600"
+            if val == "REFURBISH":   return "background-color:#FFF3CD; color:#856404; font-weight:600"
+            return ""
+        if "STATUS" in styler.columns:
+            styler.applymap(color_status, subset=["STATUS"])
+        # Angka 0 di-grey
+        num_cols = [c for c in df_show.columns if c not in ["JENIS 2", "TYPE", "STATUS"]]
+        def grey_zero(val):
+            try:
+                return "color:#CCCCCC" if int(val) == 0 else ""
+            except Exception:
+                return ""
+        if num_cols:
+            styler.applymap(grey_zero, subset=num_cols)
+            styler.format("{:,.0f}", subset=num_cols)
+        return styler
 
-col_run, col_dl_all = st.columns([2, 1])
-
-with col_run:
-    run_rekap = st.button(
-        "🚀 GENERATE REKAP SEKARANG",
-        type="primary",
+    st.dataframe(
+        df_show.style.pipe(style_table),
         use_container_width=True,
+        hide_index=True,
+        height=min(600, 38 + len(df_show) * 35),
     )
 
-# Determine areas to process
+    total = int(pivot_df["Grand Total"].sum())
+    st.markdown(f"""
+    <div style="text-align:right;color:#C0392B;font-weight:700;font-size:1rem;padding:.4rem 0">
+        🔢 Grand Total <b>{area}</b>: <span style="font-size:1.25rem">{total:,}</span> unit
+    </div>""", unsafe_allow_html=True)
+
+
+# ── Command button ─────────────────────────────────────────────────────────────
+col_btn, col_info = st.columns([2, 3])
+with col_btn:
+    run = st.button("🚀 GENERATE REKAP SEKARANG", type="primary", use_container_width=True)
+with col_info:
+    st.info(f"📅 **{selected_date}** · Scope: **{rekap_scope}**")
+
 areas_to_process = (
-    list(AREA_CONFIG.keys()) if rekap_scope == "Semua Area"
-    else [rekap_scope]
+    list(AREA_CONFIG.keys()) if rekap_scope == "Semua Area" else [rekap_scope]
 )
 
-# ── GENERATE REKAP ─────────────────────────────────────────────────────────────
-if run_rekap or st.session_state.get("rekap_done"):
-    st.session_state["rekap_done"] = True
-    
-    with st.spinner("⚙️ Memproses rekap..."):
+# ── Generate ───────────────────────────────────────────────────────────────────
+if run or st.session_state.get("rekap_generated"):
+    st.session_state["rekap_generated"] = True
+
+    with st.spinner("Memproses rekap..."):
         all_pivots = {}
         for area in areas_to_process:
-            whs = AREA_CONFIG[area]["warehouses"]
-            pivot = build_pivot(area, selected_date, whs, show_zeros)
+            whs   = AREA_CONFIG[area]["warehouses"]
+            pivot = build_pivot(area, selected_date, whs)
             all_pivots[area] = (pivot, whs)
         log_rekap(selected_date, rekap_scope)
-    
-    st.success(f"✅ Rekap berhasil di-generate untuk **{len(areas_to_process)} area**!")
+
+    st.success(f"✅ Rekap berhasil — **{len(areas_to_process)} area** | {selected_date}")
     st.divider()
-    
-    # ── Render per area ────────────────────────────────────────────────────────
-    export_files = {}
-    
+
     for area, (pivot_df, whs) in all_pivots.items():
-        st.markdown(f'<div class="pivot-area-header">🏢 {area} — {len(whs)} Warehouse</div>', 
+        # Header area
+        st.markdown(f'<div class="area-header">🏢 STOCK NTE {area} — {len(whs)} Warehouse</div>',
                     unsafe_allow_html=True)
-        
-        # WH coverage check
+
+        # Coverage check
         df_detail = get_rekap_per_wh(area, selected_date)
-        reported = df_detail["warehouse"].unique().tolist() if not df_detail.empty else []
-        missing = [w for w in whs if w not in reported]
-        
+        reported  = df_detail["warehouse"].unique().tolist() if not df_detail.empty else []
+        missing   = [w for w in whs if w not in reported]
         if missing:
-            st.warning(f"⚠️ {len(missing)} warehouse belum lapor: **{', '.join(missing)}**")
-        
+            st.warning(f"⚠️ **{len(missing)} WH belum lapor:** {', '.join(missing)}")
+
         # Pivot table
-        render_pivot_table(pivot_df, whs, area)
-        
-        # Export button per area
+        render_rekap_table(pivot_df, whs, area)
+
+        # Export per area
         if not pivot_df.empty:
-            excel_bytes = export_rekap_area_excel(
-                pivot_df=pivot_df,
-                detail_df=df_detail,
-                area=area,
-                tanggal=selected_date,
-                warehouses=whs
+            xlsx = export_rekap_area_excel(
+                pivot_df=pivot_df, detail_df=df_detail,
+                area=area, tanggal=selected_date, warehouses=whs
             )
-            export_files[area] = excel_bytes
-            
             st.download_button(
                 label=f"⬇️ Export Excel — {area}",
-                data=excel_bytes,
-                file_name=f"Rekap_NTE_{area.replace(' ', '_')}_{selected_date}.xlsx",
+                data=xlsx,
+                file_name=f"STOCK_NTE_{area.replace(' ','_')}_{selected_date}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"dl_{area}"
             )
-        
         st.divider()
-    
-    # ── Grand Summary across all areas ────────────────────────────────────────
+
+    # ── Grand total lintas area ─────────────────────────────────────────────
     if rekap_scope == "Semua Area":
-        st.markdown("### 🔢 Grand Summary — Semua Area")
+        st.markdown("### 🔢 Grand Total — Semua Area")
         df_grand = get_rekap_grand_total(selected_date)
-        
+
         if not df_grand.empty:
-            summary_pivot = df_grand.pivot_table(
-                index=["jenis_nte", "type_nte", "status_nte"],
-                columns="area",
-                values="total_stock",
-                aggfunc="sum",
-                fill_value=0
+            gp = df_grand.pivot_table(
+                index=["jenis_nte","type_nte","status_nte"],
+                columns="area", values="total_stock",
+                aggfunc="sum", fill_value=0
             ).reset_index()
-            summary_pivot.columns.name = None
-            
-            area_cols = [c for c in summary_pivot.columns if c not in ["jenis_nte", "type_nte", "status_nte"]]
-            summary_pivot["GRAND TOTAL SEMUA AREA"] = summary_pivot[area_cols].sum(axis=1)
-            summary_pivot = summary_pivot[summary_pivot["GRAND TOTAL SEMUA AREA"] > 0]
-            summary_pivot = summary_pivot.rename(columns={
-                "jenis_nte": "Jenis NTE", "type_nte": "Type NTE", "status_nte": "Status"
-            })
-            
-            st.dataframe(summary_pivot, use_container_width=True, hide_index=True)
-            
-            total_semua = int(summary_pivot["GRAND TOTAL SEMUA AREA"].sum())
+            gp.columns.name = None
+            area_cols = [c for c in gp.columns if c not in ["jenis_nte","type_nte","status_nte"]]
+            gp["GRAND TOTAL SEMUA AREA"] = gp[area_cols].sum(axis=1)
+            gp = gp[gp["GRAND TOTAL SEMUA AREA"] > 0]
+            gp = gp.rename(columns={"jenis_nte":"JENIS 2","type_nte":"TYPE","status_nte":"STATUS"})
+            st.dataframe(gp, use_container_width=True, hide_index=True)
+
+            total_all = int(gp["GRAND TOTAL SEMUA AREA"].sum())
             st.markdown(f"""
-            <div class="grand-total-box">
-                <div style="font-size:0.9rem; color:#F57F17; font-weight:600; text-transform:uppercase">
-                    Total Keseluruhan Semua Area
+            <div class="grand-box">
+                <div style="color:#F57F17;font-weight:600;font-size:.9rem;text-transform:uppercase">
+                    Grand Total Keseluruhan Semua Area
                 </div>
-                <div style="font-family:'Space Grotesk',sans-serif; font-size:3rem; font-weight:700; color:#1E3A5F">
-                    {total_semua:,}
+                <div style="font-family:'Space Grotesk',sans-serif;font-size:2.8rem;font-weight:700;color:#1E3A5F">
+                    {total_all:,}
                 </div>
-                <div style="color:#666">unit NTE · {selected_date}</div>
-            </div>
-            """, unsafe_allow_html=True)
+                <div style="color:#888;font-size:.9rem">unit NTE · {selected_date}</div>
+            </div>""", unsafe_allow_html=True)
+
 else:
-    st.info("👆 Klik tombol **GENERATE REKAP SEKARANG** untuk memulai rekap otomatis.")
+    st.info("👆 Klik **GENERATE REKAP SEKARANG** untuk memulai rekap otomatis.")

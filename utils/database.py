@@ -15,10 +15,8 @@ def get_connection():
     return conn
 
 def init_db():
-    """Inisialisasi database dan buat tabel jika belum ada"""
     conn = get_connection()
     c = conn.cursor()
-    
     c.execute("""
         CREATE TABLE IF NOT EXISTS stok_harian (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,7 +32,6 @@ def init_db():
             UNIQUE(tanggal, warehouse, type_nte, status_nte)
         )
     """)
-    
     c.execute("""
         CREATE TABLE IF NOT EXISTS rekap_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,12 +41,10 @@ def init_db():
             generated_by TEXT DEFAULT 'system'
         )
     """)
-    
     conn.commit()
     conn.close()
 
 def upsert_stok(tanggal, area, warehouse, jenis_nte, type_nte, status_nte, closing_stock):
-    """Insert atau update data stok"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("""
@@ -62,10 +57,9 @@ def upsert_stok(tanggal, area, warehouse, jenis_nte, type_nte, status_nte, closi
     conn.close()
 
 def bulk_upsert_stok(df: pd.DataFrame):
-    """Bulk insert dari DataFrame (upload Excel)"""
     conn = get_connection()
     success, errors = 0, []
-    for _, row in df.iterrows():
+    for idx, row in df.iterrows():
         try:
             c = conn.cursor()
             c.execute("""
@@ -80,13 +74,12 @@ def bulk_upsert_stok(df: pd.DataFrame):
             ))
             success += 1
         except Exception as e:
-            errors.append(f"Baris {_+2}: {str(e)}")
+            errors.append(f"Baris {idx+2}: {str(e)}")
     conn.commit()
     conn.close()
     return success, errors
 
 def get_stok_by_date(tanggal: str) -> pd.DataFrame:
-    """Ambil semua data stok untuk tanggal tertentu"""
     conn = get_connection()
     df = pd.read_sql_query(
         "SELECT * FROM stok_harian WHERE tanggal=? ORDER BY area, warehouse, jenis_nte, type_nte, status_nte",
@@ -96,7 +89,6 @@ def get_stok_by_date(tanggal: str) -> pd.DataFrame:
     return df
 
 def get_stok_by_area_date(area: str, tanggal: str) -> pd.DataFrame:
-    """Ambil data stok berdasarkan area dan tanggal"""
     conn = get_connection()
     df = pd.read_sql_query(
         "SELECT * FROM stok_harian WHERE area=? AND tanggal=? ORDER BY warehouse, jenis_nte, type_nte, status_nte",
@@ -106,7 +98,6 @@ def get_stok_by_area_date(area: str, tanggal: str) -> pd.DataFrame:
     return df
 
 def get_rekap_grand_total(tanggal: str) -> pd.DataFrame:
-    """Grand total per type_nte dan status per semua WH"""
     conn = get_connection()
     df = pd.read_sql_query("""
         SELECT area, jenis_nte, type_nte, status_nte,
@@ -121,7 +112,6 @@ def get_rekap_grand_total(tanggal: str) -> pd.DataFrame:
     return df
 
 def get_rekap_per_wh(area: str, tanggal: str) -> pd.DataFrame:
-    """Rekap per warehouse dalam satu area untuk grand total per type"""
     conn = get_connection()
     df = pd.read_sql_query("""
         SELECT jenis_nte, type_nte, status_nte, warehouse, closing_stock
@@ -133,7 +123,6 @@ def get_rekap_per_wh(area: str, tanggal: str) -> pd.DataFrame:
     return df
 
 def get_tren_stok(type_nte: str, status_nte: str, days: int = 30) -> pd.DataFrame:
-    """Tren stok untuk type NTE tertentu selama N hari terakhir"""
     conn = get_connection()
     df = pd.read_sql_query("""
         SELECT tanggal, area, SUM(closing_stock) as total_stock
@@ -155,7 +144,6 @@ def get_available_dates() -> list:
     return dates
 
 def get_wh_coverage(tanggal: str) -> pd.DataFrame:
-    """Cek warehouse mana yang sudah lapor pada tanggal tertentu"""
     conn = get_connection()
     df = pd.read_sql_query(
         "SELECT DISTINCT area, warehouse FROM stok_harian WHERE tanggal=?",
