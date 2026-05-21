@@ -1,6 +1,6 @@
 # 📦 NTE Stock Dashboard
 **Sistem Pelaporan Stok Harian Network Terminal Environment**  
-Telkom Indonesia — Area Bandung & Soreang
+Telkom Akses Indonesia — Area Bandung & Soreang
 
 ---
 
@@ -73,6 +73,17 @@ nte_dashboard/
 | TELKOM SOREANG | 5 warehouse |
 | **Total** | **17 warehouse** |
 
+| Area | Jumlah WH |
+|------|-----------|
+| TELKOMSEL BANDUNG | 12 warehouse |
+| TELKOMSEL SOREANG | 5 warehouse |
+| **Total** | **17 warehouse** |
+
+| Area | Jumlah WH |
+|------|-----------|
+| TIF BANDUNG | 5 warehouse |
+| TIF SOREANG | 3 warehouse |
+| **Total** | **8 warehouse** |
 ---
 
 ## 🔧 Kustomisasi
