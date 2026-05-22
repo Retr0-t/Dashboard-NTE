@@ -157,169 +157,40 @@ for op in ALL_OPERATORS:
 
 st.divider()
 
-# ──────────────────────────────────────────────────────────────────────────────
 # ── Ringkasan stok per operator ───────────────────────────────────────────────
-# ──────────────────────────────────────────────────────────────────────────────
-
 if not df_all.empty:
-
-    st.markdown(
-        '<div class="section-title">📈 Ringkasan Stok per Operator & Area</div>',
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="section-title">📈 Ringkasan Stok per Operator & Area</div>',
+                unsafe_allow_html=True)
 
     for op in filter_op:
-
         df_op = df_all[df_all["operator"] == op]
-
         if df_op.empty:
             continue
-
         txt_color, bg_color = OP_COLOR[op]
-
         st.markdown(
             f'<span style="background:{bg_color};color:{txt_color};padding:3px 12px;'
             f'border-radius:20px;font-weight:700;font-size:.9rem">{op}</span>',
             unsafe_allow_html=True
         )
-
-        # =====================================================================
-        # AREA LOOP
-        # =====================================================================
-
-        for area in sorted(df_op["area"].unique()):
-
-            df_area = df_op[df_op["area"] == area]
-
-            st.markdown(
-                f"""
-                <div style="
-                    margin-top:15px;
-                    margin-bottom:10px;
-                    font-weight:700;
-                    font-size:1rem;
-                    color:#1E3A5F;
-                ">
-                    📍 {area}
-                </div>
-                """,
-                unsafe_allow_html=True
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            summary = (
+                df_op.groupby(["area","jenis_nte","status_nte"])["closing_stock"]
+                .sum().reset_index()
+                .rename(columns={"area":"Area","jenis_nte":"Jenis NTE",
+                                 "status_nte":"Status","closing_stock":"Total Stok"})
+                .sort_values("Total Stok", ascending=False)
             )
-
-            c1, c2 = st.columns([5, 1])
-
-            # =================================================================
-            # MATRIX TABLE
-            # =================================================================
-
-            with c1:
-
-                # =============================================================
-                # PIVOT TABLE
-                # =============================================================
-
-                matrix_df = pd.pivot_table(
-                    df_area,
-                    index=[
-                        "jenis_nte",
-                        "status_nte",
-                        "type_nte"
-                    ],
-                    columns="warehouse",
-                    values="closing_stock",
-                    aggfunc="sum",
-                    fill_value=0
-                ).reset_index()
-
-                # =============================================================
-                # GRAND TOTAL
-                # =============================================================
-
-                warehouse_cols = [
-                    c for c in matrix_df.columns
-                    if c not in [
-                        "jenis_nte",
-                        "status_nte",
-                        "type_nte"
-                    ]
-                ]
-
-                matrix_df["GRAND TOTAL"] = (
-                    matrix_df[warehouse_cols]
-                    .sum(axis=1)
-                )
-
-                # =============================================================
-                # RENAME COLUMN
-                # =============================================================
-
-                matrix_df = matrix_df.rename(columns={
-                    "jenis_nte": "JENIS NTE",
-                    "status_nte": "STATUS",
-                    "type_nte": "TYPE NTE"
-                })
-
-                # =============================================================
-                # SORTING
-                # =============================================================
-
-                matrix_df = matrix_df.sort_values(
-                    by=["JENIS NTE", "STATUS", "TYPE NTE"]
-                )
-
-                # =============================================================
-                # STYLE HEATMAP
-                # =============================================================
-
-                styled_matrix = (
-                    matrix_df.style
-                    .background_gradient(
-                        cmap="Blues",
-                        subset=warehouse_cols + ["GRAND TOTAL"]
-                    )
-                    .format(precision=0)
-                )
-
-                # =============================================================
-                # DISPLAY
-                # =============================================================
-
-                st.dataframe(
-                    styled_matrix,
-                    hide_index=True,
-                    use_container_width=True,
-                    height=650
-                )
-
-            # =================================================================
-            # SIDE KPI
-            # =================================================================
-
-            with c2:
-
-                st.metric(
-                    "📦 Total Unit",
-                    f"{int(df_area['closing_stock'].sum()):,}"
-                )
-
-                st.metric(
-                    "🧩 Type NTE",
-                    df_area["type_nte"].nunique()
-                )
-
-                st.metric(
-                    "🏭 WH Lapor",
-                    df_area["warehouse"].nunique()
-                )
-
-            st.divider()
-
+            st.dataframe(summary, hide_index=True, use_container_width=True,
+                         column_config={"Total Stok": st.column_config.NumberColumn(format="%d unit")})
+        with c2:
+            st.metric("Total Unit", f"{int(df_op['closing_stock'].sum()):,}")
+            st.metric("Type NTE",   df_op["type_nte"].nunique())
+            st.metric("WH Lapor",   df_op["warehouse"].nunique())
+        st.divider()
 else:
+    st.info(f"📭 Belum ada data untuk **{selected_date}**. Silakan input via menu **Input Stok** atau **Upload Excel**.")
 
-    st.info(
-        f"📭 Belum ada data untuk **{selected_date}**. "
-        "Silakan input via menu **Input Stok** atau **Upload Excel**."
-    )
 # ── Quick links ───────────────────────────────────────────────────────────────
 c1,c2,c3,c4 = st.columns(4)
 c1.page_link("pages/1_Input_Stok.py",    label="✏️ Input Stok Manual",  use_container_width=True)

@@ -1,4 +1,4 @@
-"""Page: Input Stok Manual — filter operator → area → warehouse"""
+"""Page: Input Stok Manual — katalog NTE sesuai operator yang dipilih"""
 
 import streamlit as st
 import pandas as pd
@@ -8,7 +8,7 @@ from datetime import date
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from utils.database import init_db, upsert_stok, get_stok, delete_stok
 from data.master_data import (AREA_CONFIG, ALL_OPERATORS, NTE_STATUS,
-                               NTE_CATALOG, NTE_TYPE_TO_JENIS)
+                               NTE_CATALOG_BY_OPERATOR, get_type_to_jenis)
 init_db()
 
 st.set_page_config(page_title="Input Stok | NTE Dashboard", page_icon="✏️", layout="wide")
@@ -28,41 +28,35 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif}
 st.markdown("""
 <div class="page-header">
     <h2>✏️ Input Stok Manual</h2>
-    <p>Input data closing stock harian per operator → area → warehouse</p>
+    <p>Katalog NTE otomatis menyesuaikan operator yang dipilih</p>
 </div>
 """, unsafe_allow_html=True)
 
-# ── Sidebar filter: operator → area_key → warehouse ───────────────────────────
 with st.sidebar:
     st.markdown("### ⚙️ Pilih Warehouse")
     selected_date = st.date_input("📅 Tanggal", value=date.today())
+    selected_op   = st.selectbox("🏢 Operator", ALL_OPERATORS)
 
-    selected_op = st.selectbox("🏢 Operator", ALL_OPERATORS)
+    op_area_keys  = [k for k, v in AREA_CONFIG.items() if v["operator"] == selected_op]
+    sel_area_key  = st.selectbox("📍 Area", op_area_keys)
+    whs           = AREA_CONFIG[sel_area_key]["warehouses"]
+    sel_wh        = st.selectbox("🏭 Warehouse", whs)
 
-    # area keys milik operator ini
-    op_area_keys = [k for k, v in AREA_CONFIG.items() if v["operator"] == selected_op]
-    selected_area_key = st.selectbox("📍 Area", op_area_keys)
-
-    whs = AREA_CONFIG[selected_area_key]["warehouses"]
-    selected_wh = st.selectbox("🏭 Warehouse", whs)
-
-cfg = AREA_CONFIG[selected_area_key]
+cfg     = AREA_CONFIG[sel_area_key]
+catalog = NTE_CATALOG_BY_OPERATOR.get(selected_op, {})
+t2j     = get_type_to_jenis(selected_op)
 
 st.markdown(
-    f"### Input: **{selected_wh}**  "
+    f"### ✏️ Input: **{sel_wh}**  "
     f"<small style='color:#666'>— {selected_op} | {cfg['area']} | {selected_date.strftime('%d %b %Y')}</small>",
     unsafe_allow_html=True
 )
 
-# Data existing
-existing = get_stok(str(selected_date), operator=selected_op)
-existing_wh = (
-    existing[existing["warehouse"] == selected_wh]
-    if not existing.empty else pd.DataFrame()
-)
+existing    = get_stok(str(selected_date), operator=selected_op)
+existing_wh = existing[existing["warehouse"]==sel_wh] if not existing.empty else pd.DataFrame()
 
 if not existing_wh.empty:
-    st.success(f"✅ **{len(existing_wh)} entri** sudah tersimpan — data baru akan menimpa.")
+    st.success(f"✅ **{len(existing_wh)} entri** sudah tersimpan — akan ditimpa jika diubah.")
     with st.expander("Lihat data tersimpan"):
         st.dataframe(
             existing_wh[["jenis_nte","type_nte","status_nte","closing_stock"]],
@@ -70,51 +64,47 @@ if not existing_wh.empty:
         )
 
 st.divider()
-st.markdown("#### 📦 Isi Closing Stock")
-st.caption("Isi angka stok akhir. Biarkan 0 jika tidak ada.")
+st.markdown(f"#### 📦 Closing Stock — {selected_op}")
+st.caption("Katalog NTE sudah disesuaikan untuk operator ini. Isi 0 jika tidak ada.")
+
+if not catalog:
+    st.warning("Katalog NTE untuk operator ini belum diisi. Edit `data/master_data.py`.")
+    st.stop()
 
 inputs = {}
-
-for jenis, types in NTE_CATALOG.items():
+for jenis, types in catalog.items():
     with st.expander(f"📁 **{jenis}** ({len(types)} type)", expanded=False):
         for type_nte in types:
             cols = st.columns([3, 2, 2])
             cols[0].markdown(
-                f"<small style='color:#555'>{type_nte.replace('_',' ')}</small>",
+                f"<small style='color:#444'>{type_nte.replace('_',' ')}</small>",
                 unsafe_allow_html=True
             )
             for si, status in enumerate(NTE_STATUS):
-                key = f"{type_nte}||{status}"
+                key     = f"{type_nte}||{status}"
                 default = 0
                 if not existing_wh.empty:
                     m = existing_wh[
-                        (existing_wh["type_nte"] == type_nte) &
+                        (existing_wh["type_nte"]   == type_nte) &
                         (existing_wh["status_nte"] == status)
                     ]
                     if not m.empty:
                         default = int(m.iloc[0]["closing_stock"])
-
-                badge_cls = "s-baru" if status == "NTE BARU" else "s-refurbish"
-                cols[si+1].markdown(
-                    f'<span class="{badge_cls}">{status}</span>',
-                    unsafe_allow_html=True
-                )
+                badge = "s-baru" if status == "NTE BARU" else "s-refurbish"
+                cols[si+1].markdown(f'<span class="{badge}">{status}</span>', unsafe_allow_html=True)
                 inputs[key] = cols[si+1].number_input(
-                    label=f"{type_nte} {status}",
-                    label_visibility="collapsed",
+                    label=f"{type_nte} {status}", label_visibility="collapsed",
                     min_value=0, value=default, key=key
                 )
 
 st.divider()
-
-# Preview
 non_zero = {k: v for k, v in inputs.items() if v > 0}
 if non_zero:
     st.markdown("#### 👁️ Preview (hanya yang > 0)")
     rows = []
     for key, val in non_zero.items():
         t, s = key.split("||")
-        rows.append({"Jenis": NTE_TYPE_TO_JENIS.get(t,"-"), "Type": t, "Status": s, "Stok": val})
+        rows.append({"Jenis":t2j.get(t,"-"),"Type":t,"Status":s,"Stok":val})
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
 c1, c2 = st.columns([4,1])
@@ -125,27 +115,20 @@ with c1:
             if val > 0:
                 type_nte, status_nte = key.split("||")
                 upsert_stok(
-                    tanggal      = str(selected_date),
-                    operator     = selected_op,
-                    area         = cfg["area"],
-                    area_key     = selected_area_key,
-                    warehouse    = selected_wh,
-                    jenis_nte    = NTE_TYPE_TO_JENIS.get(type_nte,"Lainnya"),
-                    type_nte     = type_nte,
-                    status_nte   = status_nte,
-                    closing_stock= val
+                    tanggal=str(selected_date), operator=selected_op,
+                    area=cfg["area"], area_key=sel_area_key,
+                    warehouse=sel_wh, jenis_nte=t2j.get(type_nte,"Lainnya"),
+                    type_nte=type_nte, status_nte=status_nte, closing_stock=val
                 )
                 saved += 1
         if saved:
-            st.success(f"✅ **{saved} entri** disimpan untuk {selected_op} | {selected_wh}!")
-            st.balloons(); st.rerun()
+            st.success(f"✅ **{saved} entri** disimpan!"); st.balloons(); st.rerun()
         else:
-            st.warning("⚠️ Tidak ada data > 0 untuk disimpan.")
-
+            st.warning("⚠️ Tidak ada data > 0.")
 with c2:
     if st.button("🗑️ Hapus WH Ini", use_container_width=True):
         if not existing_wh.empty:
-            delete_stok(str(selected_date), selected_op, selected_wh)
+            delete_stok(str(selected_date), selected_op, sel_wh)
             st.warning("Data dihapus."); st.rerun()
         else:
             st.info("Tidak ada data.")
