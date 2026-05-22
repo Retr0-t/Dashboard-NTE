@@ -1,113 +1,116 @@
-"""
-Page: Master Data - Kelola daftar NTE types
-"""
-
+"""Page: Master Data"""
 import streamlit as st
 import pandas as pd
 import sys, os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-from data.master_data import AREA_CONFIG, NTE_CATALOG, NTE_STATUS, ALL_NTE_TYPES
+from data.master_data import AREA_CONFIG, NTE_CATALOG, NTE_STATUS, ALL_NTE_TYPES, ALL_OPERATORS, ALL_AREAS
 
 st.set_page_config(page_title="Master Data | NTE Dashboard", page_icon="🗂️", layout="wide")
-
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap');
-html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-.page-header {
-    background: linear-gradient(135deg, #37474F, #546E7A);
-    color: white; padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 1.5rem;
-}
-.page-header h2 { font-family: 'Space Grotesk', sans-serif; margin: 0; font-size: 1.5rem; }
-.page-header p { margin: 0.25rem 0 0; opacity: 0.8; font-size: 0.9rem; }
+html,body,[class*="css"]{font-family:'Inter',sans-serif}
+.page-header{background:linear-gradient(135deg,#37474F,#546E7A);color:white;
+  padding:1.5rem 2rem;border-radius:12px;margin-bottom:1.5rem}
+.page-header h2{font-family:'Space Grotesk',sans-serif;margin:0;font-size:1.5rem}
+.page-header p{margin:.25rem 0 0;opacity:.8;font-size:.9rem}
+.op-badge{display:inline-block;padding:3px 12px;border-radius:20px;font-size:.78rem;font-weight:600;margin:2px}
 </style>
 """, unsafe_allow_html=True)
+
+OP_STYLE = {
+    "TELKOMSEL": "background:#E8F5E9;color:#1B5E20",
+    "TELKOM":    "background:#E3F2FD;color:#0D47A1",
+    "TIF":       "background:#FFF3E0;color:#E65100",
+}
 
 st.markdown("""
 <div class="page-header">
     <h2>🗂️ Master Data</h2>
-    <p>Referensi data warehouse, area, dan katalog NTE</p>
+    <p>Referensi operator, area, warehouse, dan katalog NTE</p>
 </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["🏭 Daftar Warehouse", "📦 Katalog NTE", "ℹ️ Info Sistem"])
+tab1, tab2, tab3 = st.tabs(["🏭 Warehouse", "📦 Katalog NTE", "ℹ️ Info"])
 
 with tab1:
-    st.markdown("### Daftar Warehouse per Area")
-    
-    for area, config in AREA_CONFIG.items():
-        whs = config["warehouses"]
-        with st.expander(f"🏢 {area} — {len(whs)} Warehouse", expanded=True):
-            cols = st.columns(3)
-            for i, wh in enumerate(whs):
-                cols[i % 3].markdown(f"**{i+1}.** {wh}")
-    
-    # Table view
+    st.markdown("### Daftar Warehouse per Operator & Area")
+
+    total_wh = sum(len(v["warehouses"]) for v in AREA_CONFIG.values())
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total Kombinasi", len(AREA_CONFIG))
+    c2.metric("Total WH Entry", total_wh)
+    c3.metric("Operator", len(ALL_OPERATORS))
+    c4.metric("Area", len(ALL_AREAS))
+
     st.divider()
-    st.markdown("#### Tabel Lengkap")
+
+    for op in ALL_OPERATORS:
+        style = OP_STYLE.get(op,"")
+        st.markdown(
+            f'<span class="op-badge" style="{style}">{op}</span>',
+            unsafe_allow_html=True
+        )
+        cols = st.columns(2)
+        for ai, area in enumerate(ALL_AREAS):
+            ak = f"{op} - {area}"
+            if ak not in AREA_CONFIG: continue
+            whs = AREA_CONFIG[ak]["warehouses"]
+            with cols[ai]:
+                with st.expander(f"📍 {area} — {len(whs)} WH", expanded=True):
+                    for i, wh in enumerate(whs, 1):
+                        st.caption(f"{i}. {wh}")
+        st.divider()
+
+    # Tabel flat
     rows = []
-    for area, config in AREA_CONFIG.items():
-        for i, wh in enumerate(config["warehouses"], 1):
-            rows.append({"No": i, "Area": area, "Warehouse": wh})
-    df_wh = pd.DataFrame(rows)
-    st.dataframe(df_wh, use_container_width=True, hide_index=True)
+    for ak, cfg in AREA_CONFIG.items():
+        for wh in cfg["warehouses"]:
+            rows.append({"Operator":cfg["operator"],"Area":cfg["area"],
+                         "Area Key":ak,"Warehouse":wh})
+    st.markdown("#### Tabel Lengkap")
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
 with tab2:
-    st.markdown("### Katalog NTE")
-    st.caption(f"Total: **{len(ALL_NTE_TYPES)} type NTE** dalam **{len(NTE_CATALOG)} kategori**")
-    
+    st.markdown(f"### Katalog NTE — {len(ALL_NTE_TYPES)} type dalam {len(NTE_CATALOG)} kategori")
     for jenis, types in NTE_CATALOG.items():
-        with st.expander(f"📁 {jenis} — {len(types)} type", expanded=False):
-            for t in types:
-                st.markdown(f"- `{t}`")
-    
+        with st.expander(f"📁 {jenis} — {len(types)} type"):
+            for t in types: st.caption(f"• {t}")
     st.divider()
-    # Full table
-    rows = []
-    for jenis, types in NTE_CATALOG.items():
-        for t in types:
-            rows.append({"Jenis NTE": jenis, "Type NTE": t})
-    df_nte = pd.DataFrame(rows)
-    st.dataframe(df_nte, use_container_width=True, hide_index=True)
+    rows2 = [{"Jenis NTE":j,"Type NTE":t}
+             for j,ts in NTE_CATALOG.items() for t in ts]
+    st.dataframe(pd.DataFrame(rows2), hide_index=True, use_container_width=True)
 
 with tab3:
     st.markdown("### ℹ️ Informasi Sistem")
-    
-    col1, col2 = st.columns(2)
-    with col1:
+    c1, c2 = st.columns(2)
+    with c1:
         st.markdown("""
-        **NTE Stock Dashboard v1.0.0**
-        
-        Sistem pelaporan stok harian NTE (Network Terminal Environment) untuk:
-        - Area **Telkom Bandung** (12 warehouse)
-        - Area **Telkom Soreang** (5 warehouse)
-        
-        **Fitur:**
-        - ✏️ Input stok manual per warehouse
-        - 📤 Upload batch via Excel
-        - ⚡ Rekap otomatis 1-klik per area
-        - 📊 Grand total per type NTE lintas warehouse
-        - 📉 Tren stok harian dengan grafik
-        - ⬇️ Export ke Excel dengan format rapi
+        **NTE Stock Dashboard v2.0.0**
+
+        Sistem pelaporan stok NTE untuk:
+
+        | Operator | Bandung | Soreang |
+        |----------|---------|---------|
+        | TELKOMSEL | 12 WH | 5 WH |
+        | TELKOM | 12 WH | 5 WH |
+        | TIF | 4 WH | 3 WH |
+        | **Total** | **28** | **13** |
+
+        **Total entry WH: 41**
         """)
-    with col2:
+    with c2:
         st.markdown("""
-        **Alur Penggunaan Harian:**
-        
-        1. Setiap PIC warehouse mengisi stok closing
-        2. Input via form manual atau upload Excel
-        3. Admin klik **Rekap Otomatis** setelah semua WH lapor
-        4. Rekap otomatis generate pivot table per area
-        5. Export Excel untuk arsip / distribusi
-        
-        **Format Tanggal:** YYYY-MM-DD
-        
+        **Cara Edit Nama Warehouse**
+
+        Edit file `data/master_data.py` bagian `AREA_CONFIG`.
+        Tidak perlu ubah file lain.
+
         **Status NTE:**
-        - 🟢 **Baru** — perangkat baru belum pernah dipakai
-        - 🟡 **Refurbish** — perangkat bekas yang sudah diperbaiki
+        - 🟢 **NTE BARU** — perangkat baru
+        - 🟡 **REFURBISH** — bekas, sudah diperbaiki
+
+        **Format key area:** `OPERATOR - AREA`
+        Contoh: `TIF - SOREANG`
         """)
-    
-    st.divider()
-    st.markdown("**Kontak:** Tim IT Telkom Indonesia | NTE Operations")

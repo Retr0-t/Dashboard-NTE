@@ -1,12 +1,17 @@
 """
-Master data untuk NTE Dashboard - Disesuaikan dengan format laporan asli
-STOCK NTE TELKOM BANDUNG / SOREANG
+Master data NTE Dashboard
+Operator: Telkomsel, Telkom, TIF
+Area    : Bandung, Soreang
 """
 
 # ── Area & Warehouse ─────────────────────────────────────────────────────────
-# Nama WH bisa diedit langsung di sini sesuai nama resmi masing-masing area
+# Key format: "OPERATOR - AREA"
 AREA_CONFIG = {
-    "TELKOM BANDUNG": {
+
+    # ── TELKOMSEL ─────────────────────────────────────────────────────────────
+    "TELKOMSEL - BANDUNG": {
+        "operator": "TELKOMSEL",
+        "area": "BANDUNG",
         "warehouses": [
             "TA SO CCAN AHMAD YANI WH",
             "TA SO CCAN BANDUNG CENTRUM WH",
@@ -20,35 +25,96 @@ AREA_CONFIG = {
             "TA SO CCAN RAJAWALI WH",
             "TA SO CCAN SINDANGLAYA WH",
             "TA SO CCAN UJUNG BERUNG WH",
-            # Jika ada WH ke-13 dst, tambahkan di sini
-            # "TA WITEL CCAN JABAR TENGAH (BANDUNG) WH",
         ]
     },
-    "TELKOM SOREANG": {
+    "TELKOMSEL - SOREANG": {
+        "operator": "TELKOMSEL",
+        "area": "SOREANG",
         "warehouses": [
             "TA SO CCAN SOREANG WH",
             "TA SO CCAN BANJARAN WH",
             "TA SO CCAN MAJALAYA WH",
             "TA SO CCAN SOREANG 2 WH",
             "TA SO CCAN CIWIDEY WH",
-            # Edit nama-nama di atas sesuai 5 WH Soreang yang sebenarnya
+        ]
+    },
+
+    # ── TELKOM ────────────────────────────────────────────────────────────────
+    "TELKOM - BANDUNG": {
+        "operator": "TELKOM",
+        "area": "BANDUNG",
+        "warehouses": [
+            "TA SO CCAN AHMAD YANI WH",
+            "TA SO CCAN BANDUNG CENTRUM WH",
+            "TA SO CCAN CIANJUR WH",
+            "TA SO CCAN CUAURA WH",
+            "TA SO CCAN CIMAHI WH",
+            "TA SO CCAN GEGERKALONG WH",
+            "TA SO CCAN KOPO WH",
+            "TA SO CCAN LEMBANG WH",
+            "TA SO CCAN PADALARANG WH",
+            "TA SO CCAN RAJAWALI WH",
+            "TA SO CCAN SINDANGLAYA WH",
+            "TA SO CCAN UJUNG BERUNG WH",
+        ]
+    },
+    "TELKOM - SOREANG": {
+        "operator": "TELKOM",
+        "area": "SOREANG",
+        "warehouses": [
+            "TA SO CCAN SOREANG WH",
+            "TA SO CCAN BANJARAN WH",
+            "TA SO CCAN MAJALAYA WH",
+            "TA SO CCAN SOREANG 2 WH",
+            "TA SO CCAN CIWIDEY WH",
+        ]
+    },
+
+    # ── TIF ───────────────────────────────────────────────────────────────────
+    "TIF - BANDUNG": {
+        "operator": "TIF",
+        "area": "BANDUNG",
+        "warehouses": [
+            "TA SO TIF BANDUNG CENTRIUM WH",
+            "TA SO TIF CIJAURA WH",
+            "TA SO TIF GEGERKALONG WH",
+            "TA SO TIF UJUNGBERUNG WH",
+        ]
+    },
+    "TIF - SOREANG": {
+        "operator": "TIF",
+        "area": "SOREANG",
+        "warehouses": [
+            "TA SO TIF KADIPATEN WH",
+            "TA SO TIF MAJALENGKA WH",
+            "TA SO TIF SUMEDANG WH",
         ]
     },
 }
 
-ALL_WAREHOUSES = []
-WAREHOUSE_TO_AREA = {}
-for area, config in AREA_CONFIG.items():
-    for wh in config["warehouses"]:
-        ALL_WAREHOUSES.append(wh)
-        WAREHOUSE_TO_AREA[wh] = area
+# ── Helper lookups ────────────────────────────────────────────────────────────
+ALL_WAREHOUSES       = []
+WAREHOUSE_TO_AREA_KEY = {}   # wh_name -> list of area_keys (WH bisa di >1 operator)
 
-# ── Status NTE — sesuai format laporan asli ──────────────────────────────────
+for area_key, config in AREA_CONFIG.items():
+    for wh in config["warehouses"]:
+        if wh not in ALL_WAREHOUSES:
+            ALL_WAREHOUSES.append(wh)
+        WAREHOUSE_TO_AREA_KEY.setdefault(wh, []).append(area_key)
+
+ALL_OPERATORS = ["TELKOMSEL", "TELKOM", "TIF"]
+ALL_AREAS     = ["BANDUNG", "SOREANG"]
+
+def get_area_keys_by_operator(operator: str):
+    return [k for k, v in AREA_CONFIG.items() if v["operator"] == operator]
+
+def get_area_keys_by_area(area: str):
+    return [k for k, v in AREA_CONFIG.items() if v["area"] == area]
+
+# ── Status NTE ────────────────────────────────────────────────────────────────
 NTE_STATUS = ["NTE BARU", "REFURBISH"]
 
-# ── Katalog NTE — sesuai gambar laporan STOCK NTE TELKOM BANDUNG ─────────────
-# Format: { "JENIS": ["TYPE_1", "TYPE_2", ...] }
-# Tambah/hapus type sesuai kebutuhan lapangan
+# ── Katalog NTE ───────────────────────────────────────────────────────────────
 NTE_CATALOG = {
     "AP": [
         "AP_CISCO_C9105AXI-F",
@@ -84,7 +150,7 @@ NTE_CATALOG = {
     "ONT PREMIUM": [
         "ONT_FIBERHOME_HG6145F1",
         "ONT_ZTE_F670_V2.0",
-        "ONT_FIBERHOME_HG6245N",  # REFURBISH only
+        "ONT_FIBERHOME_HG6245N",
     ],
     "ONT SINGLE BAND": [
         "ONT_FIBERHOME_AN5506-04-F",
@@ -116,8 +182,7 @@ NTE_CATALOG = {
     ],
 }
 
-# Flatten semua type NTE
-ALL_NTE_TYPES = []
+ALL_NTE_TYPES     = []
 NTE_TYPE_TO_JENIS = {}
 for jenis, types in NTE_CATALOG.items():
     for t in types:
