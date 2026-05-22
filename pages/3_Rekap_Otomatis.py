@@ -108,10 +108,10 @@ def render_pivot(pivot_df, warehouses, label):
             ]
         return [""]*len(s)
 
-    num_cols = [c for c in df_show.columns if c not in ["JENIS 2","TYPE","STATUS"]]
+    num_cols = [c for c in df_show.columns if c not in ["JENIS 2","TYPE","STATUS"] and pd.api.types.is_numeric_dtype(df_show[c])]
     styled = df_show.style.apply(styler)
     if num_cols:
-        styled = styled.format("{:,.0f}", subset=num_cols)
+        styled = styled.format("{:,.0f}", subset=num_cols, na_rep="-")
 
     st.dataframe(styled, use_container_width=True, hide_index=True,
                  height=min(600, 38 + len(df_show)*35))

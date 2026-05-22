@@ -294,11 +294,17 @@ def apply_styles(styler):
                 styles.append("background-color:#D5F5E3;color:#1E8449")   # hijau
         return styles
 
-    styler.applymap(color_status, subset=["STATUS"])
+    # pandas ≥2.1: applymap → map
+    _map = getattr(styler, "map", None) or styler.applymap
+    _map(color_status, subset=["STATUS"])
     styler.apply(color_gt)
     if show_heatmap:
         styler.apply(heatmap)
-    styler.format("{:,.0f}", subset=[c for c in num_cols if c in df_show.columns])
+    # Format angka — hanya kolom yang benar-benar ada dan bertipe numerik
+    fmt_cols = [c for c in num_cols if c in df_show.columns
+                and pd.api.types.is_numeric_dtype(df_show[c])]
+    if fmt_cols:
+        styler.format("{:,.0f}", subset=fmt_cols, na_rep="-")
     return styler
 
 styled = df_show.style.pipe(apply_styles)
