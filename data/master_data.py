@@ -18,7 +18,7 @@ AREA_CONFIG = {
             "TA SO INV AHMAD YANI WH",
             "TA SO INV BANDUNG CENTRUM WH",
             "TA SO INV CIANJUR WH",
-            "TA SO INV CUAURA WH",
+            "TA SO INV CIJAURA WH",
             "TA SO INV CIMAHI WH",
             "TA SO INV GEGERKALONG WH",
             "TA SO INV KOPO WH",
@@ -27,17 +27,18 @@ AREA_CONFIG = {
             "TA SO INV RAJAWALI WH",
             "TA SO INV SINDANGLAYA WH",
             "TA SO INV UJUNG BERUNG WH",
+            "TA WITEL INV BANDUNG BARAT WH"
         ]
     },
     "TELKOMSEL - SOREANG": {
         "operator": "TELKOMSEL",
         "area": "SOREANG",
         "warehouses": [
-            "TA SO INV SOREANG WH",
+            "TA SO INV KADIPATEN WH",
             "TA SO INV BANJARAN WH",
             "TA SO INV MAJALAYA WH",
-            "TA SO INV SOREANG 2 WH",
-            "TA SO INV CIWIDEY WH",
+            "TA SO INV SUMEDANG WH",
+            "TA SO INV MAJALENGKA WH",
         ]
     },
 
@@ -49,7 +50,7 @@ AREA_CONFIG = {
             "TA SO CCAN AHMAD YANI WH",
             "TA SO CCAN BANDUNG CENTRUM WH",
             "TA SO CCAN CIANJUR WH",
-            "TA SO CCAN CUAURA WH",
+            "TA SO CCAN CIJAURA WH",
             "TA SO CCAN CIMAHI WH",
             "TA SO CCAN GEGERKALONG WH",
             "TA SO CCAN KOPO WH",
@@ -58,17 +59,18 @@ AREA_CONFIG = {
             "TA SO CCAN RAJAWALI WH",
             "TA SO CCAN SINDANGLAYA WH",
             "TA SO CCAN UJUNG BERUNG WH",
+            "TA WITEL CCAN JABAR TENGAH (BANDUNG) WH",
         ]
     },
     "TELKOM - SOREANG": {
         "operator": "TELKOM",
         "area": "SOREANG",
         "warehouses": [
-            "TA SO CCAN SOREANG WH",
+            "TA SO CCAN KADIPATEN WH",
             "TA SO CCAN BANJARAN WH",
             "TA SO CCAN MAJALAYA WH",
-            "TA SO CCAN SOREANG 2 WH",
-            "TA SO CCAN CIWIDEY WH",
+            "TA SO CCAN SUMEDANG WH",
+            "TA SO CCAN MAJALENGKA WH",
         ]
     },
 
@@ -81,12 +83,15 @@ AREA_CONFIG = {
             "TA SO TIF CIJAURA WH",
             "TA SO TIF GEGERKALONG WH",
             "TA SO TIF UJUNGBERUNG WH",
+            "TA SO TIF PADALARANG WH",
+            "TA SO TIF SINDANGLAYA WH",
         ]
     },
     "TIF - SOREANG": {
         "operator": "TIF",
         "area": "SOREANG",
         "warehouses": [
+            "TA SO TIF BANJARAN WH",
             "TA SO TIF KADIPATEN WH",
             "TA SO TIF MAJALENGKA WH",
             "TA SO TIF SUMEDANG WH",
