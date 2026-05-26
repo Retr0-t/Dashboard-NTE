@@ -1,0 +1,12 @@
+streamlit>=1.32.0
+pandas>=2.0.0
+openpyxl>=3.1.0
+plotly>=5.18.0
+reportlab>=4.0.0
+Pillow>=10.0.0
+# Optional: untuk preview JPG yang lebih baik
+# pdf2image>=1.16.0   # perlu: sudo apt install poppler-utils
+
+# API server (untuk WhatsApp bot)
+fastapi>=0.110.0
+uvicorn>=0.27.0
