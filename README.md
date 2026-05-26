@@ -1,115 +1,142 @@
-# 📦 NTE Stock Dashboard
-**Sistem Pelaporan Stok Harian Network Terminal Environment**  
-Telkom Indonesia — Area Bandung & Soreang
+# 🤖 NTE WhatsApp Bot
+Bot WhatsApp untuk laporan stok harian NTE Telkom Indonesia.
 
 ---
 
-## 🚀 Cara Instalasi & Menjalankan
+## 📋 Prasyarat
 
-### 1. Prasyarat
-- Python 3.9 atau lebih baru
-- pip
+- Node.js v18 atau lebih baru
+- Google Chrome / Chromium (untuk whatsapp-web.js)
+- Dashboard NTE sudah berjalan (`api_server.py`)
 
-### 2. Install Dependencies
+---
+
+## 🚀 Instalasi
+
+```bash
+# 1. Masuk folder bot
+cd nte_whatsapp_bot
+
+# 2. Install dependencies
+npm install
+
+# 3. Buat file konfigurasi
+cp .env.example .env
+
+# 4. Edit .env sesuai kebutuhan
+nano .env   # atau buka dengan text editor
+
+# 5. Jalankan bot
+node bot.js
+```
+
+---
+
+## ⚙️ Konfigurasi (.env)
+
+| Key | Keterangan |
+|-----|-----------|
+| `API_BASE_URL` | URL API dashboard NTE (default: http://localhost:8502) |
+| `ALLOWED_NUMBERS` | Nomor WA yang boleh pakai bot (628xxx, pisahkan koma) |
+| `REPORT_TARGET` | Tujuan laporan otomatis (nomor@c.us atau groupid@g.us) |
+| `CRON_SCHEDULE` | Jadwal kirim otomatis (cron syntax) |
+| `AUTO_REPORT_FORMAT` | Format laporan otomatis: `pdf` atau `jpg` |
+
+---
+
+## 📱 Cara Scan QR
+
+1. Jalankan `node bot.js`
+2. QR code muncul di terminal
+3. Buka WhatsApp di HP → titik tiga → Perangkat Tertaut → Tautkan Perangkat
+4. Scan QR code
+5. Bot siap digunakan ✅
+
+Session tersimpan otomatis di folder `.wwebjs_auth` — tidak perlu scan ulang kecuali logout.
+
+---
+
+## 💬 Daftar Perintah
+
+### Laporan PDF / JPG
+
+| Perintah | Keterangan |
+|----------|-----------|
+| `/laporan` | Semua laporan hari ini (ZIP PDF) |
+| `/laporan semua jpg` | Semua laporan hari ini dalam JPG (dikirim satu per satu) |
+| `/laporan telkomsel bandung` | 1 laporan PDF |
+| `/laporan telkomsel bandung jpg` | 1 laporan JPG |
+| `/laporan tsel bdg 2025-05-19` | Laporan tanggal tertentu |
+| `/laporan telkom` | Semua area Telkom hari ini |
+
+### Ringkasan Teks
+
+| Perintah | Keterangan |
+|----------|-----------|
+| `/stok` | Ringkasan semua stok hari ini |
+| `/stok telkomsel` | Ringkasan per operator |
+| `/stok tif bandung` | Ringkasan per area |
+
+### Informasi
+
+| Perintah | Keterangan |
+|----------|-----------|
+| `/bantuan` | Daftar semua perintah |
+| `/tanggal` | Daftar tanggal yang ada data |
+| `/status` | Cek koneksi server |
+
+---
+
+## 🔄 Menjalankan Dashboard + Bot Bersamaan
+
+Buka **2 terminal terpisah**:
+
+**Terminal 1 — Dashboard Streamlit:**
 ```bash
 cd nte_dashboard
-pip install -r requirements.txt
+streamlit run app.py --server.port 8501
 ```
 
-### 3. Jalankan Dashboard
+**Terminal 2 — API Server:**
 ```bash
-streamlit run app.py
+cd nte_dashboard
+pip install fastapi uvicorn
+uvicorn api_server:app --host 0.0.0.0 --port 8502
 ```
-Dashboard akan terbuka otomatis di browser: `http://localhost:8501`
 
----
-
-## 📁 Struktur File
-
-```
-nte_dashboard/
-├── app.py                  # Home page (overview & KPI)
-├── requirements.txt
-├── data/
-│   ├── master_data.py      # Konfigurasi area, WH, katalog NTE
-│   └── nte_stok.db         # Database SQLite (auto-generated)
-├── utils/
-│   ├── database.py         # CRUD & query functions
-│   └── export_utils.py     # Generator Excel
-└── pages/
-    ├── 1_Input_Stok.py     # Input manual per warehouse
-    ├── 2_Upload_Excel.py   # Upload batch dari Excel
-    ├── 3_Rekap_Otomatis.py # ⚡ 1-klik rekap per area
-    ├── 4_Tren_Stok.py      # Grafik tren stok harian
-    └── 5_Master_Data.py    # Referensi data & info
+**Terminal 3 — WhatsApp Bot:**
+```bash
+cd nte_whatsapp_bot
+node bot.js
 ```
 
 ---
 
-## 📋 Cara Pakai Harian
+## 🖥️ Menjalankan sebagai Service (Linux — agar berjalan terus)
 
-### Alur Normal:
-1. **PIC Warehouse** → buka menu **Input Stok** atau upload Excel
-2. Isi closing stock per type NTE dan status (Baru/Refurbish)
-3. **Admin/Koordinator** → buka **Rekap Otomatis**
-4. Pilih tanggal → klik **GENERATE REKAP SEKARANG**
-5. Dashboard otomatis:
-   - Menampilkan pivot table per area
-   - Menghitung grand total per type NTE lintas warehouse
-   - Tombol export Excel per area
+```bash
+# Install PM2
+npm install -g pm2
 
-### Upload Excel Batch:
-1. Download template dari menu **Upload Excel**
-2. Isi data (bisa untuk banyak WH sekaligus)
-3. Upload → simpan ke database
+# Jalankan bot dengan PM2
+pm2 start bot.js --name nte-bot
 
----
+# Auto-start saat server reboot
+pm2 startup
+pm2 save
 
-## 🏢 Konfigurasi Area
-
-| Area | Jumlah WH |
-|------|-----------|
-| TELKOM BANDUNG | 12 warehouse |
-| TELKOM SOREANG | 5 warehouse |
-| **Total** | **17 warehouse** |
-
----
-
-## 🔧 Kustomisasi
-
-### Tambah Warehouse Baru
-Edit `data/master_data.py` → bagian `AREA_CONFIG`
-
-### Tambah Type NTE Baru  
-Edit `data/master_data.py` → bagian `NTE_CATALOG`
-
-### Ubah Nama Warehouse yang Sudah Ada
-Edit `data/master_data.py` dan pastikan nama di database lama juga disesuaikan
-
----
-
-## 📊 Format Rekap Otomatis (Output Excel)
-
-Setiap file Excel rekap berisi:
-- **Sheet 'Rekap [Area]'**: Pivot table dengan kolom per warehouse + grand total per type NTE
-- **Sheet 'Data Detail'**: Raw data untuk keperluan audit
-
-Contoh grand total:
-```
-Type NTE               | WH Banjaran | WH Kadipaten | WH Majalaya | WH Majalengka | WH Sumedang | GRAND TOTAL
-AP_Cisco_C9105AXI-F   |      2      |      3       |     10      |      30       |      1      |     46
+# Lihat log
+pm2 logs nte-bot
 ```
 
 ---
 
-## 🗄️ Database
+## 💡 Tips
 
-Menggunakan **SQLite** — tidak perlu instalasi server database.  
-File `data/nte_stok.db` ter-generate otomatis saat pertama kali dijalankan.
-
-Untuk backup: cukup copy file `nte_stok.db`
+- Gunakan nomor WA **khusus** untuk bot (bukan nomor pribadi)
+- Jangan kirim terlalu banyak pesan sekaligus (risiko banned)
+- Untuk produksi lebih aman gunakan **Fonnte** atau **WA Business API**
 
 ---
 
-*Dibuat untuk menggantikan sistem pelaporan Google Sheets*  
-*v1.0.0 | NTE Operations*
+*NTE Operations · Telkom Indonesia*
